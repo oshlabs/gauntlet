@@ -59,9 +59,23 @@ Micro.solve(input) == (<expected>)`. For raise-assertions use
    (`String.strip/1`, `Enum.filter_map/3`) — the checks only pass with the
    real API. Never *mention* the fake function in the prompt; the trap is
    that the model reaches for it.
-7. **No third-party libraries, no Mix, no filesystem/network** in either
-   solutions or checks. Erlang stdlib via `:math`, `:binary`, `:rand`
-   (seeded) etc. is allowed where idiomatic.
+7. **No third-party libraries, no Mix — and no dangerous or impure calls**
+   in prompts, solutions, or checks. Banned outright: `File.*`, `:file`,
+   `System.cmd`/`shell`/`halt`, `System.get_env`/`put_env`, `:os.*`,
+   `Port.*`/`open_port`, network modules (`:httpc`, `:gen_tcp`,
+   `:gen_udp`, `:ssl`, `:inets`), `Node.*`/distribution, `:ets`. `Path.*`
+   is fine (pure string functions) but `Path.expand`/`absname` must take
+   an explicit base — never depend on cwd. This is both a determinism rule
+   and a safety rule: the sandbox is process isolation, not a container,
+   and item content must never *invite* the model toward side-effecting
+   APIs — a benign model answering "return the first three letters" has
+   no reason to emit file operations, and prompts must keep it that way.
+   In-BEAM processes (`spawn`, `send`/`receive`, `Task`, `Agent`) are
+   allowed where they ARE the knowledge being tested; synchronize
+   everything, no sleeps beyond ~50 ms. Erlang stdlib via `:math`,
+   `:binary`, `:crypto.hash`, `:queue` etc. is allowed where idiomatic
+   and pure. `Code.eval_string` only over fixed literals from the item's
+   own checks.
 8. **Difficulty calibration**: `:easy` = any Elixir programmer answers
    instantly (String.upcase); `:medium` = requires actually knowing the
    API/semantics (Enum.chunk_every step, Range step syntax, charlist

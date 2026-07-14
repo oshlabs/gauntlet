@@ -392,3 +392,19 @@ hard timeout, process-group kill. That is honest containment for benchmarking
 models you chose to run, not a security boundary against adversarial code —
 generated code could still touch the filesystem or network during a test
 run. If you ever benchmark untrusted models, wrap runs in a container.
+
+Two deliberate policies keep the practical exposure small:
+
+- **Task content is audited to be side-effect-free.** No task, check, or
+  reference solution touches the filesystem, shell, network, environment,
+  ports, or distribution (grep-audited across all packs; the authoring
+  rules in `priv/tasks/micro/AUTHORING.md` ban these outright, partly for
+  determinism, partly for safety). The only I/O in a benchmark run is the
+  harness's own run-directory writes.
+- **Prompts never invite side effects.** Every task asks for a pure
+  computation over an in-memory value. A benign model answering "return
+  the first three letters of this string" has no reason to emit file
+  operations — so uncontained execution is a calculated risk taken for
+  models you deliberately installed, not an oversight. The moment you
+  benchmark a model you *don't* trust (a random community fine-tune),
+  that reasoning no longer holds: use a container.

@@ -1,0 +1,13 @@
+# Task
+
+<%= @prompt %>
+
+# Program
+
+```elixir
+<%= @stub %>
+```
+
+# Answer format
+
+Reply with the program's exact standard output in a single ```output fenced code block — nothing else in the block, no commentary inside it. If you show more than one block, only the LAST one is graded.

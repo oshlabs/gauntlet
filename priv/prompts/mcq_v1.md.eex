@@ -1,0 +1,11 @@
+# Question
+
+<%= @prompt %>
+<%= if @stub do %>
+```elixir
+<%= @stub %>
+```
+<% end %>
+# Answer format
+
+End your reply with a line of exactly `ANSWER: <letter>` (for example `ANSWER: B`). Only the last such line is graded.

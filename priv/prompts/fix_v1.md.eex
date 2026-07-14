@@ -1,0 +1,24 @@
+# Task
+
+<%= @prompt %>
+
+# Broken code
+
+```elixir
+<%= @buggy %>
+```
+<%= if @failure_output do %>
+# Failing test output
+
+```
+<%= @failure_output %>
+```
+<% end %>
+<%= if @context do %>
+# Reference material
+
+<%= @context %>
+<% end %>
+# Answer format
+
+Reply with the complete fixed module (named exactly `<%= @module_name %>`) in a single ```elixir fenced code block. If you show more than one code block, only the LAST one is graded.

@@ -1,0 +1,23 @@
+# Task
+
+<%= @prompt %>
+
+# Requirements
+
+- Define a module named exactly `<%= @module_name %>`.
+- Your solution will be compiled and run against a hidden ExUnit test suite.
+<%= if @stub do %>
+# Starting code
+
+```elixir
+<%= @stub %>
+```
+<% end %>
+<%= if @context do %>
+# Reference material
+
+<%= @context %>
+<% end %>
+# Answer format
+
+Reply with the complete solution in a single ```elixir fenced code block. If you show more than one code block, only the LAST one is graded.

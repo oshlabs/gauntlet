@@ -8,7 +8,12 @@ defmodule Gauntlet.MixProject do
       elixir: "~> 1.19",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
-      deps: deps()
+      deps: deps(),
+      description: "Execution-graded benchmark of LLM capability at Elixir",
+      package: [
+        licenses: ["MIT"],
+        links: %{}
+      ]
     ]
   end
 

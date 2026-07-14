@@ -385,6 +385,12 @@ knowledge, not fence discipline.
   format-diff, optional pinned LLM judge as a separate score), behavioral
   runtime probes as a distinct grader, context-injection experiments.
 
+## License
+
+MIT — see [LICENSE](LICENSE). Task-pack content (prompts, checks, reference
+solutions) is covered by the same license; if you add an imported pack
+(e.g. Exercism-derived), keep its upstream license file alongside it.
+
 ## Trust model
 
 The sandbox is *process-level* isolation: separate OS process, no deps,

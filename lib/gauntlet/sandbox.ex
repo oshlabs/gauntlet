@@ -47,15 +47,20 @@ defmodule Gauntlet.Sandbox do
   @spec run_tests(String.t(), keyword()) :: test_result()
   def run_tests(attempt_dir, opts \\ []) do
     timeout = Keyword.get(opts, :timeout_ms, 60_000)
-    results_path = Path.join(attempt_dir, @results_file)
+    # Absolute: the child runs with cwd = attempt_dir, and a relative path
+    # would silently point the formatter at a non-existent subtree.
+    results_path = Path.expand(Path.join(attempt_dir, @results_file))
 
+    # No setsid: the port child is already a process-group leader (verified —
+    # its pgid equals its pid), so the timeout kill of -os_pid reaches the
+    # whole tree. setsid would fork, making exit_status the parent's 0.
     port =
       Port.open({:spawn_executable, System.find_executable("sh")}, [
         :binary,
         :exit_status,
         :stderr_to_stdout,
         :hide,
-        {:args, ["-c", "exec setsid mix test --seed 0 --max-failures 20"]},
+        {:args, ["-c", "exec mix test --seed 0 --max-failures 20"]},
         {:cd, attempt_dir},
         {:env,
          [

@@ -219,16 +219,19 @@ field, so you can always reconstruct *why*. To dig into what the model
 actually said, grep `events.jsonl` — it holds the full conversation
 including reasoning output and exact token counts.
 
-### Tiers: curated vs smoke
+### Tiers: curated vs knowledge vs smoke
 
 Scores are always split by tier before any aggregate. **curated** tasks are
 hand-written for this benchmark and target known model weak zones (OTP
 lifecycle, supervision, Registry, laziness, binaries, protocols, macros,
-Unicode). **smoke** tasks (planned M2: an Exercism import) are public
-problems that models have almost certainly trained on — they verify a
-model is minimally competent and that the plumbing works, but a high smoke
-score is *not* evidence of Elixir skill. Distrust any summary of this
-benchmark that quotes a blended number.
+Unicode). **knowledge** is the micro pack (see below) — 500 tiny language
+probes; its score reads as "how much of the Elixir surface does this model
+actually know", with error bars small enough to rank models. **smoke**
+tasks (planned M2: an Exercism import) are public problems that models
+have almost certainly trained on — they verify a model is minimally
+competent and that the plumbing works, but a high smoke score is *not*
+evidence of Elixir skill. Distrust any summary of this benchmark that
+quotes a blended number.
 
 ### Comparing models
 
@@ -295,6 +298,66 @@ genserver_kv_ttl/
    runs — that's the feature working.
 
 ---
+
+## The micro pack (`micro`, 500 knowledge items)
+
+Where the core pack asks "can you build this component", the micro pack
+asks five hundred variants of "do you actually know the language": *`input`
+is the string "foobar" — return its first three letters*. The model
+answers with a **single expression**, which is spliced into a wrapper
+module and graded by generated ExUnit tests — same execution-based
+grading, near-zero boilerplate:
+
+```elixir
+defmodule Micro do
+  def solve(input) do
+    _ = input
+    __SNIPPET__        # <- the model's expression
+  end
+end
+```
+
+Items are data, not directories — themed files in `priv/tasks/micro/`
+(`enum.exs`, `string.exs`, `collections.exs`, `kernel.exs`, `numbers.exs`,
+`datetime_access.exs`, `runtime.exs`, `utilities.exs`), each a list of
+maps:
+
+```elixir
+%{
+  id: "enum/double",
+  prompt: ~S{`input` is a list of numbers. Return a list with every value doubled.},
+  solution: ~S{Enum.map(input, &(&1 * 2))},
+  checks: [{~S{[1, 2, 3]}, ~S{[2, 4, 6]}}, {~S{[]}, ~S{[]}}],
+  tags: [:enum],
+  difficulty: :easy
+}
+```
+
+Because a wrong micro-item is self-diagnosing, the per-tag breakdown in
+`verdicts.jsonl` reads like a skills report card: strings vs OTP vs dates
+vs binaries. Three item flavors deserve mention:
+
+- **traps** (`:trap`) — the prompt's tempting answer is a function that
+  does not exist or was removed (`String.strip`, a nonexistent
+  `Enum.compact`); only the real API passes. Measures the hallucinated-
+  stdlib failure mode directly. Every trap was verified against the
+  pinned Elixir before authoring.
+- **drift** (`:drift`) — the idiomatic answer changed recently (built-in
+  `JSON` since 1.18, `Duration`/`Date.shift` since 1.17, descending-range
+  `10..1//-1`, `~c""` charlists). Distinguishes fresh from stale training
+  data.
+- **gotchas** (`:gotcha`) — semantics people (and models) get wrong:
+  `rem(-5, 3)`, `String.length` vs `byte_size`, struct comparison with
+  `<`, truthiness of `0`.
+
+Authoring more items: see `priv/tasks/micro/AUTHORING.md`; the fast
+iteration loop is `elixir priv/tasks/check_items.exs <file>` and the
+authoritative gate stays `mix gauntlet.validate --suite micro`.
+
+Run only this pack with `mix gauntlet.run --model <m> --suite micro`.
+Repair rounds apply to snippets too, and extraction is deliberately
+lenient (a bare single-line reply counts) — the pack measures language
+knowledge, not fence discipline.
 
 ## Current task pack (`core`, 11 tasks)
 

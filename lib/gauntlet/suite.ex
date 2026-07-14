@@ -95,7 +95,9 @@ defmodule Gauntlet.Suite do
 
       item_tasks =
         entries
-        |> Enum.filter(&String.ends_with?(&1, ".exs"))
+        |> Enum.filter(fn path ->
+          String.ends_with?(path, ".exs") and not String.starts_with?(Path.basename(path), "_")
+        end)
         |> Enum.flat_map(&load_item_file(pack, &1))
 
       dir_tasks ++ item_tasks

@@ -16,6 +16,27 @@ defmodule Gauntlet.Extract do
   end
 
   @doc """
+  The answer of a micro/snippet task: the last ```elixir (or plain) fenced
+  block; models that reply with just the bare expression on a single line
+  are accepted too — the point is measuring language knowledge, not fence
+  discipline. Multi-line prose without a fence is an extraction failure.
+  """
+  @spec snippet(String.t()) :: String.t() | nil
+  def snippet(text) when is_binary(text) do
+    case code_block(text) do
+      nil ->
+        trimmed = String.trim(text)
+
+        if trimmed != "" and not String.contains?(trimmed, "\n") do
+          trimmed
+        end
+
+      block ->
+        block
+    end
+  end
+
+  @doc """
   The last ```output fenced block (for predict-output tasks), or nil.
   Falls back to any fenced block, then to the trimmed full text.
   """

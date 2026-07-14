@@ -43,6 +43,7 @@ defmodule Gauntlet.Suite do
         tasks =
           def.packs
           |> Enum.flat_map(&load_pack(tasks_dir, &1))
+          |> reject_duplicate_ids!()
           |> filter(opts)
 
         {:ok,
@@ -78,18 +79,43 @@ defmodule Gauntlet.Suite do
     suites
   end
 
+  # A pack contains task directories (one full task each) and/or item files
+  # (a `<theme>.exs` evaluating to a list of micro-item maps, each becoming
+  # one :snippet task).
   defp load_pack(tasks_dir, pack) do
     pack_dir = Path.join(tasks_dir, pack)
 
     if File.dir?(pack_dir) do
-      pack_dir
-      |> File.ls!()
-      |> Enum.sort()
-      |> Enum.map(&Path.join(pack_dir, &1))
-      |> Enum.filter(&File.dir?/1)
-      |> Enum.map(&Task.load!/1)
+      entries = pack_dir |> File.ls!() |> Enum.sort() |> Enum.map(&Path.join(pack_dir, &1))
+
+      dir_tasks =
+        entries
+        |> Enum.filter(&File.dir?/1)
+        |> Enum.map(&Task.load!/1)
+
+      item_tasks =
+        entries
+        |> Enum.filter(&String.ends_with?(&1, ".exs"))
+        |> Enum.flat_map(&load_item_file(pack, &1))
+
+      dir_tasks ++ item_tasks
     else
       []
+    end
+  end
+
+  defp load_item_file(pack, path) do
+    {items, _} = Code.eval_file(path)
+
+    unless is_list(items) do
+      raise ArgumentError, "item file #{path} must evaluate to a list of maps"
+    end
+
+    tasks = Enum.map(items, &Task.from_item!(pack, path, &1))
+
+    case tasks |> Enum.frequencies_by(& &1.id) |> Enum.filter(fn {_, n} -> n > 1 end) do
+      [] -> tasks
+      dups -> raise ArgumentError, "duplicate item ids in #{path}: #{inspect(dups)}"
     end
   end
 
@@ -109,14 +135,22 @@ defmodule Gauntlet.Suite do
     end)
   end
 
-  # sha256 over sorted (task-relative path, file sha) pairs of all task files
+  defp reject_duplicate_ids!(tasks) do
+    case tasks |> Enum.frequencies_by(& &1.id) |> Enum.filter(fn {_, n} -> n > 1 end) do
+      [] -> tasks
+      dups -> raise ArgumentError, "duplicate task ids across packs: #{inspect(dups)}"
+    end
+  end
+
+  # sha256 over sorted (task-relative path, file sha) pairs of all task files.
+  # Item-file tasks share one source file; each contributes it under its own id.
   defp hash_tasks(tasks) do
     digest =
       tasks
       |> Enum.sort_by(& &1.id)
       |> Enum.flat_map(fn task ->
         task.dir
-        |> files_recursive()
+        |> task_files()
         |> Enum.sort()
         |> Enum.map(fn path ->
           rel = task.id <> "/" <> Path.relative_to(path, task.dir)
@@ -129,6 +163,10 @@ defmodule Gauntlet.Suite do
       |> Base.encode16(case: :lower)
 
     "sha256:" <> digest
+  end
+
+  defp task_files(dir) do
+    if File.dir?(dir), do: files_recursive(dir), else: [dir]
   end
 
   defp files_recursive(dir) do

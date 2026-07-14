@@ -3,12 +3,22 @@
 # weights does not invalidate cross-run comparison of raw dimension scores.
 %{
   "default" => %{
-    packs: ["core", "exercism"],
-    weights: %{generation: 0.35, debugging: 0.25, comprehension: 0.20, quality: 0.20}
+    packs: ["core", "micro", "exercism"],
+    weights: %{
+      generation: 0.30,
+      debugging: 0.20,
+      comprehension: 0.15,
+      quality: 0.15,
+      knowledge: 0.20
+    }
   },
   "core" => %{
     packs: ["core"],
     weights: %{generation: 0.35, debugging: 0.25, comprehension: 0.20, quality: 0.20}
+  },
+  "micro" => %{
+    packs: ["micro"],
+    weights: %{knowledge: 1.0}
   },
   "smoke" => %{
     packs: ["exercism"],

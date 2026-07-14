@@ -36,10 +36,11 @@ defmodule Gauntlet.Task do
             buggy: nil,
             expected: nil,
             failure_output: nil,
+            wrapper: nil,
             check_files: []
 
-  @type dimension :: :generation | :comprehension | :debugging | :quality
-  @type task_type :: :write_code | :fix_code | :predict_output | :mcq
+  @type dimension :: :generation | :comprehension | :debugging | :quality | :knowledge
+  @type task_type :: :write_code | :fix_code | :predict_output | :mcq | :snippet
 
   @type t :: %__MODULE__{
           id: String.t(),
@@ -65,9 +66,19 @@ defmodule Gauntlet.Task do
           check_files: [{String.t(), String.t()}]
         }
 
-  @dimensions [:generation, :comprehension, :debugging, :quality]
-  @types [:write_code, :fix_code, :predict_output, :mcq]
+  @dimensions [:generation, :comprehension, :debugging, :quality, :knowledge]
+  @types [:write_code, :fix_code, :predict_output, :mcq, :snippet]
   @difficulties [:smoke, :easy, :medium, :hard]
+
+  # `_ = input` keeps snippets that ignore the input warning-free.
+  @default_wrapper """
+  defmodule Micro do
+    def solve(input) do
+      _ = input
+      __SNIPPET__
+    end
+  end
+  """
 
   @doc """
   Load a task from its directory. Raises on invalid metadata.
@@ -108,12 +119,120 @@ defmodule Gauntlet.Task do
     }
   end
 
+  @doc """
+  Build a task from a micro-item map (an entry in a pack's `<theme>.exs`
+  item file). Items are tiny knowledge probes: the model answers with a
+  bare expression that gets spliced into a wrapper module, then graded by a
+  test file generated from the item's `checks`.
+
+  Item shape:
+
+      %{
+        id: "enum/double",                       # pack-relative
+        prompt: "`input` is a list of numbers. Return it with every value doubled.",
+        solution: "Enum.map(input, &(&1 * 2))",  # reference snippet
+        checks: [{"[1, 2, 3]", "[2, 4, 6]"}, {"[]", "[]"}],
+        raw_checks: ["assert_raise ArgumentError, fn -> Micro.solve(:x) end"],  # optional
+        tags: [:enum],                            # optional
+        difficulty: :easy,                        # optional, default :easy
+        weight: 1.0,                              # optional, default 1.0
+        wrapper: "defmodule Micro do ... __SNIPPET__ ... end"  # optional override
+      }
+  """
+  @spec from_item!(String.t(), String.t(), map()) :: t()
+  def from_item!(pack, source_file, item) do
+    for key <- [:id, :prompt, :solution] do
+      unless Map.has_key?(item, key) do
+        raise ArgumentError, "item in #{source_file} missing #{inspect(key)}: #{inspect(item)}"
+      end
+    end
+
+    checks = Map.get(item, :checks, [])
+    raw_checks = Map.get(item, :raw_checks, [])
+
+    if checks == [] and raw_checks == [] do
+      raise ArgumentError, "item #{item.id} in #{source_file} has no checks"
+    end
+
+    wrapper = Map.get(item, :wrapper, @default_wrapper)
+
+    unless String.contains?(wrapper, "__SNIPPET__") do
+      raise ArgumentError, "item #{item.id} wrapper has no __SNIPPET__ placeholder"
+    end
+
+    %__MODULE__{
+      id: "#{pack}/#{item.id}",
+      dimension: :knowledge,
+      type: :snippet,
+      difficulty: Map.get(item, :difficulty, :easy),
+      tags: Map.get(item, :tags, []),
+      module_name: "Micro",
+      graders: [:ex_unit],
+      timeout_ms: Map.get(item, :timeout_ms, 30_000),
+      max_tokens: Map.get(item, :max_tokens, 8_192),
+      weight: Map.get(item, :weight, 1.0) * 1.0,
+      dir: source_file,
+      prompt: item.prompt,
+      wrapper: wrapper,
+      solution: splice_snippet(wrapper, item.solution),
+      check_files: [{"solution_test.exs", item_test_file(checks, raw_checks)}]
+    }
+  end
+
+  @doc """
+  Insert a snippet into a wrapper module. If the snippet already defines
+  the wrapper module itself (a model ignoring the answer format), it is
+  used as-is — the tests still decide.
+  """
+  @spec splice_snippet(String.t(), String.t()) :: String.t()
+  def splice_snippet(wrapper, snippet) do
+    if snippet =~ ~r/\bdefmodule\s+Micro\b/ do
+      snippet
+    else
+      String.replace(wrapper, "__SNIPPET__", String.trim(snippet))
+    end
+  end
+
   @doc "Whether this task's grading requires the sandbox (compile + ExUnit)."
   @spec needs_sandbox?(t()) :: boolean()
-  def needs_sandbox?(%__MODULE__{type: type}), do: type in [:write_code, :fix_code]
+  def needs_sandbox?(%__MODULE__{type: type}), do: type in [:write_code, :fix_code, :snippet]
+
+  defp item_test_file(checks, raw_checks) do
+    check_tests =
+      checks
+      |> Enum.with_index(1)
+      |> Enum.map(fn {{input_code, expected_code}, i} ->
+        """
+          test "check #{i}" do
+            input = #{input_code}
+            assert Micro.solve(input) == (#{expected_code})
+          end
+        """
+      end)
+
+    raw_tests =
+      raw_checks
+      |> Enum.with_index(1)
+      |> Enum.map(fn {body, i} ->
+        """
+          test "raw check #{i}" do
+            #{body}
+          end
+        """
+      end)
+
+    """
+    defmodule MicroTest do
+      use ExUnit.Case, async: true
+
+    #{Enum.join(check_tests ++ raw_tests, "\n")}
+    end
+    """
+  end
 
   defp default_graders(:write_code), do: [:ex_unit]
   defp default_graders(:fix_code), do: [:ex_unit]
+  defp default_graders(:snippet), do: [:ex_unit]
   defp default_graders(:predict_output), do: [:comprehension]
   defp default_graders(:mcq), do: [:comprehension]
 

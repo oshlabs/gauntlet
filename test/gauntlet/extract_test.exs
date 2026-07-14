@@ -41,6 +41,20 @@ defmodule Gauntlet.ExtractTest do
     end
   end
 
+  describe "snippet/1" do
+    test "prefers fenced block" do
+      assert Extract.snippet("Here:\n```elixir\nEnum.sum(input)\n```") == "Enum.sum(input)"
+    end
+
+    test "accepts a bare single-line reply" do
+      assert Extract.snippet("String.upcase(input)") == "String.upcase(input)"
+    end
+
+    test "rejects multi-line prose without a fence" do
+      assert Extract.snippet("I think you should\nuse String.upcase here") == nil
+    end
+  end
+
   describe "output_block/1" do
     test "extracts output block" do
       assert Extract.output_block("```output\nhello\n```") == "hello"

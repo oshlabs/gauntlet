@@ -160,7 +160,13 @@ defmodule Gauntlet.Runner do
   end
 
   defp grade_code(ctx, task, base, result) do
-    case Extract.code_block(result.content) do
+    extracted =
+      case task.type do
+        :snippet -> Extract.snippet(result.content)
+        _ -> Extract.code_block(result.content)
+      end
+
+    case extracted do
       nil ->
         %{base | status: :extraction_failed}
 

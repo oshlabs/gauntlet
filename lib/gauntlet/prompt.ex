@@ -8,7 +8,15 @@ defmodule Gauntlet.Prompt do
 
   alias Gauntlet.Task
 
-  @versions %{system: "v1", gen: "v1", fix: "v1", predict: "v1", mcq: "v1", repair: "v1"}
+  @versions %{
+    system: "v1",
+    gen: "v1",
+    fix: "v1",
+    predict: "v1",
+    mcq: "v1",
+    snippet: "v1",
+    repair: "v1"
+  }
 
   @type built :: %{messages: [Gauntlet.Model.Adapter.message()], versions: map()}
 
@@ -46,6 +54,13 @@ defmodule Gauntlet.Prompt do
 
         :mcq ->
           render(:mcq, prompt: task.prompt, stub: task.stub)
+
+        :snippet ->
+          render(:snippet,
+            prompt: task.prompt,
+            wrapper_display:
+              task.wrapper |> String.replace("__SNIPPET__", "# YOUR ANSWER") |> String.trim()
+          )
       end
 
     %{

@@ -62,25 +62,31 @@ defmodule Gauntlet.RunnerTest do
   end
 
   test "full run: pass, fail and comprehension verdicts + artifacts", ctx do
-    respond_by_task(%{"Adder" => @good_adder, "pin operator" => "ANSWER: B"})
+    respond_by_task(%{
+      "Adder" => @good_adder,
+      "pin operator" => "ANSWER: B",
+      "upcased" => "String.upcase(input)"
+    })
 
     {:ok, %{summary: summary, run_dir: run_dir, verdicts: verdicts}} =
       Runner.run(ctx.model, ctx.suite, runs_dir: ctx.runs_dir, progress: fn _ -> :ok end)
 
-    assert length(verdicts) == 2
+    assert length(verdicts) == 3
     assert Enum.all?(verdicts, &(&1.status == :pass))
 
     # scores
     assert summary.dimensions.generation.pass1 == 1.0
     assert summary.dimensions.comprehension.pass1 == 1.0
+    assert summary.dimensions.knowledge.pass1 == 1.0
+    assert summary.tiers.knowledge.pass1 == 1.0
     assert summary.composite == 1.0
-    assert summary.usage.output_tokens == 40
+    assert summary.usage.output_tokens == 60
 
     # artifacts
     assert File.regular?(Path.join(run_dir, "meta.json"))
     assert File.regular?(Path.join(run_dir, "report.md"))
     assert File.regular?(Path.join(run_dir, "summary.json"))
-    assert length(Store.read_verdicts(run_dir)) == 2
+    assert length(Store.read_verdicts(run_dir)) == 3
 
     meta = Store.read_meta(run_dir)
     assert meta["suite"]["hash"] =~ "sha256:"

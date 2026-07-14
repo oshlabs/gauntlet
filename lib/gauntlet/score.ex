@@ -57,6 +57,7 @@ defmodule Gauntlet.Score do
     }
   end
 
+  defp tier(%{dimension: :knowledge}), do: :knowledge
   defp tier(%{difficulty: :smoke}), do: :smoke
   defp tier(_), do: :curated
 

@@ -1,0 +1,13 @@
+# Task
+
+<%= @prompt %>
+
+# Answer format
+
+Your answer will be inserted verbatim where `# YOUR ANSWER` is:
+
+```elixir
+<%= @wrapper_display %>
+```
+
+Reply with ONLY that expression — no `defmodule`, no `def`, no explanation. A single expression (pipes allowed), in one ```elixir fenced code block.

@@ -58,7 +58,7 @@ defmodule Mix.Tasks.Gauntlet.Validate do
   end
 
   defp validate(%BenchTask{type: type} = task, template, work_dir)
-       when type in [:write_code, :fix_code] do
+       when type in [:write_code, :fix_code, :snippet] do
     cond do
       task.solution == nil ->
         [{task.id, "no solution.ex"}]

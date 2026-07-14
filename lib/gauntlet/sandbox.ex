@@ -24,9 +24,18 @@ defmodule Gauntlet.Sandbox do
   @doc """
   Copy the warmed template to `attempt_dir` and install the solution
   (as `lib/solution.ex`) plus the task's hidden check files (into `test/`).
+
+  For `:snippet` tasks, `code` is the bare expression and is spliced into
+  the task's wrapper module first.
   """
   @spec materialize(String.t(), Task.t(), String.t(), String.t()) :: :ok
   def materialize(template_dir, %Task{} = task, code, attempt_dir) do
+    code =
+      case task.type do
+        :snippet -> Task.splice_snippet(task.wrapper, code)
+        _ -> code
+      end
+
     File.mkdir_p!(attempt_dir)
     File.cp_r!(template_dir, attempt_dir)
     File.write!(Path.join(attempt_dir, "lib/solution.ex"), code)

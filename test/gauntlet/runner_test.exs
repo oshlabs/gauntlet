@@ -151,6 +151,43 @@ defmodule Gauntlet.RunnerTest do
     assert Enum.all?(verdicts, &(&1.status == :llm_error))
   end
 
+  test "temperature and reasoning overrides reach the adapter and meta.json", ctx do
+    test_pid = self()
+
+    Gauntlet.Model.Fake.set_handler(fn model, _messages, _opts ->
+      send(test_pid, {:seen_model, model.temperature, model.reasoning_effort})
+
+      {:ok,
+       %{content: "ANSWER: B", thinking: nil, usage: %{}, finish_reason: :stop, latency_ms: 1}}
+    end)
+
+    mcq_only = %{ctx.suite | tasks: Enum.filter(ctx.suite.tasks, &(&1.type == :mcq))}
+
+    {:ok, %{run_dir: run_dir}} =
+      Runner.run(ctx.model, mcq_only,
+        runs_dir: ctx.runs_dir,
+        temperature: 0.7,
+        reasoning_effort: "high",
+        progress: fn _ -> :ok end
+      )
+
+    assert_receive {:seen_model, 0.7, :high}
+
+    meta = Store.read_meta(run_dir)
+    assert meta["model"]["temperature"] == 0.7
+    assert meta["model"]["reasoning_effort"] == "high"
+  end
+
+  test "invalid reasoning effort raises before any request", ctx do
+    assert_raise ArgumentError, ~r/valid/, fn ->
+      Runner.run(ctx.model, ctx.suite,
+        runs_dir: ctx.runs_dir,
+        reasoning_effort: "max",
+        progress: fn _ -> :ok end
+      )
+    end
+  end
+
   test "truncated responses are marked truncated", ctx do
     Gauntlet.Model.Fake.set_handler(fn _model, _messages, _opts ->
       {:ok,

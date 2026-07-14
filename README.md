@@ -119,7 +119,35 @@ $ mix gauntlet.run --model deepseek-v4-flash --samples 3
 
 # include each task's context.md in the prompt (the context-injection experiment)
 $ mix gauntlet.run --model deepseek-v4-flash --context
+
+# enable thinking on a reasoning model (values: none minimal low medium high xhigh)
+$ mix gauntlet.run --model deepseek-v4-flash --suite micro --reasoning high
+
+# sample at a different temperature (overrides the registry entry for this run)
+$ mix gauntlet.run --model deepseek-v4-flash --temperature 0.7 --samples 3
+
+# compare thinking off vs on — two runs, same suite hash, directly comparable
+$ mix gauntlet.run --model deepseek-v4-flash --suite micro --reasoning none
+$ mix gauntlet.run --model deepseek-v4-flash --suite micro --reasoning xhigh
 ```
+
+**Reasoning models: thinking is off unless you ask.** OpenAI-compatible
+reasoning endpoints (like vLLM with a reasoning parser) only think when the
+request carries a `reasoning_effort` — even if the *server* was launched
+with a default effort. Gauntlet sends it only when set, either per model in
+`models.exs` (`reasoning_effort: :medium`) or per run with `--reasoning`;
+the CLI flag wins, and the effective value is recorded in the run's
+`meta.json` (treat runs with different efforts as different benchmark
+conditions — that's the point). req_llm's option schema passes efforts up
+to `xhigh`; the `max` some servers accept is not requestable through it.
+Expect thinking runs to be slower and heavier: reasoning tokens count
+toward `max_tokens` headroom, and the reasoning text is captured per
+request in `events.jsonl` (never parsed for code).
+
+`--temperature` likewise overrides the registry per run. `0.0` (the
+default in the example registry) is the right choice for reproducible
+single-sample benchmarking; raise it only when sampling diversity is the
+experiment, e.g. together with `--samples`.
 
 Discovery:
 

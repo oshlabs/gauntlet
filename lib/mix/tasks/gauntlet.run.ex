@@ -6,6 +6,13 @@ defmodule Mix.Tasks.Gauntlet.Run do
 
       mix gauntlet.run --model deepseek-v4-flash [--suite default]
         [--samples 1] [--repair] [--context] [--only SUBSTR] [--runs-dir runs]
+        [--temperature 0.0] [--reasoning none|minimal|low|medium|high|xhigh]
+
+  `--temperature` and `--reasoning` override the model registry entry for
+  this run only; the values actually used are recorded in the run's
+  meta.json. Without `--reasoning` (and no registry default), no reasoning
+  effort is requested — reasoning-capable servers then typically answer
+  without thinking.
 
   Prints the report and the run directory when done.
   """
@@ -20,7 +27,9 @@ defmodule Mix.Tasks.Gauntlet.Run do
     context: :boolean,
     only: :string,
     runs_dir: :string,
-    models_path: :string
+    models_path: :string,
+    temperature: :float,
+    reasoning: :string
   ]
 
   @impl true
@@ -41,6 +50,8 @@ defmodule Mix.Tasks.Gauntlet.Run do
       |> put_if(:only, opts[:only])
       |> put_if(:runs_dir, opts[:runs_dir])
       |> put_if(:models_path, opts[:models_path])
+      |> put_if(:temperature, opts[:temperature])
+      |> put_if(:reasoning_effort, opts[:reasoning])
 
     case Gauntlet.run(model, suite, run_opts) do
       {:ok, %{run_dir: run_dir}} ->

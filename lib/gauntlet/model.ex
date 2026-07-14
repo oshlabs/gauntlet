@@ -13,6 +13,7 @@ defmodule Gauntlet.Model do
             max_concurrency: 4,
             max_tokens: 16_384,
             temperature: 0.0,
+            reasoning_effort: nil,
             stream: false,
             stream_options: nil,
             reasoning: %{expected: false},
@@ -28,6 +29,7 @@ defmodule Gauntlet.Model do
           max_concurrency: pos_integer(),
           max_tokens: pos_integer(),
           temperature: float(),
+          reasoning_effort: atom() | nil,
           stream: boolean(),
           stream_options: map() | nil,
           reasoning: map(),
@@ -57,6 +59,40 @@ defmodule Gauntlet.Model do
     with {:ok, registry} <- read_registry(path) do
       {:ok, Map.keys(registry)}
     end
+  end
+
+  @valid_efforts [:none, :minimal, :low, :medium, :high, :xhigh]
+
+  @doc """
+  Apply runtime overrides (`:temperature`, `:reasoning_effort`) to a model.
+  Overridden values flow into requests AND into the run's meta.json, so a
+  run is always labeled with the parameters actually used.
+
+  `reasoning_effort` accepts #{inspect(@valid_efforts)} (string or atom) or
+  nil to send nothing (many servers then default to no thinking). req_llm's
+  option schema does not pass a `max` tier — use `:xhigh` for the highest
+  request-able effort.
+  """
+  @spec with_overrides(t(), keyword()) :: t()
+  def with_overrides(%__MODULE__{} = model, opts) do
+    model
+    |> maybe_put(:temperature, opts[:temperature])
+    |> maybe_put(:reasoning_effort, normalize_effort(opts[:reasoning_effort]))
+  end
+
+  defp maybe_put(model, _key, nil), do: model
+  defp maybe_put(model, key, value), do: Map.put(model, key, value)
+
+  defp normalize_effort(nil), do: nil
+
+  defp normalize_effort(effort) when is_binary(effort),
+    do: normalize_effort(String.to_existing_atom(effort))
+
+  defp normalize_effort(effort) when effort in @valid_efforts, do: effort
+
+  defp normalize_effort(other) do
+    raise ArgumentError,
+          "invalid reasoning effort #{inspect(other)}; valid: #{inspect(@valid_efforts)}"
   end
 
   @doc "Resolve the API key for a model from its configured env var."

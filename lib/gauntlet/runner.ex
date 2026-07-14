@@ -32,6 +32,7 @@ defmodule Gauntlet.Runner do
   """
   @spec run(Model.t(), Suite.t(), keyword()) :: {:ok, map()}
   def run(%Model{} = model, %Suite{} = suite, opts \\ []) do
+    model = Model.with_overrides(model, opts)
     samples = Keyword.get(opts, :samples, 1)
     store = Store.create(model.name, suite.name, meta(model, suite, opts), opts)
 
@@ -284,6 +285,7 @@ defmodule Gauntlet.Runner do
         spec: model.model_spec,
         base_url: model.base_url,
         temperature: model.temperature,
+        reasoning_effort: model.reasoning_effort,
         max_tokens: model.max_tokens
       },
       suite: %{name: suite.name, hash: suite.hash, task_count: length(suite.tasks)},

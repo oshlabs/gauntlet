@@ -30,6 +30,14 @@ defmodule Gauntlet.Model.ReqLlm do
         api_key: Model.api_key(model),
         receive_timeout: model.request_timeout_ms
       ]
+      |> then(fn gen_opts ->
+        # Only sent when configured: without it, reasoning-capable servers
+        # typically run with thinking disabled.
+        case model.reasoning_effort do
+          nil -> gen_opts
+          effort -> Keyword.put(gen_opts, :reasoning_effort, effort)
+        end
+      end)
 
     started = System.monotonic_time(:millisecond)
 
